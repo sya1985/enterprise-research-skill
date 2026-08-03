@@ -32,13 +32,9 @@ enterprise-research 是一个企业全维度背调技能。当你找工作想要
 - **地域岗位**：指定城市的测试/测开岗位招聘情况
 - **多维评分**：8 个维度 0-10 评分（发展前景、稳定性、薪资竞争力、工作生活平衡、福利完善度、技术成长性、岗位匹配度、公司规模）
 
-<img width="3189" height="1797" alt="image" src="https://github.com/user-attachments/assets/9853bcdb-9128-41e6-8eaf-c1f87610fd5f" />
-
 ### 企业多维对比看板
 每次背调一家企业，会在企业多维对比看板上自动新增一条数据，也可以手动新增或者删除数据。
-> 图片中的数据仅供演示使用，不构成任何求职建议。
 
-<img width="3813" height="1864" alt="image" src="https://github.com/user-attachments/assets/fe4aef32-bb8e-4e45-8e09-d42c7bef0db7" />
 
 ### 使用方式
 #### 安装
