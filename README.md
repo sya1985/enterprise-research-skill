@@ -34,7 +34,7 @@ enterprise-research 是一个企业全维度背调技能。当你找工作想要
 
 ### 企业多维对比看板
 每次背调一家企业，会在企业多维对比看板上自动新增一条数据，也可以手动新增或者删除数据。
-
+<img width="1901" height="944" alt="image" src="https://github.com/user-attachments/assets/a1b1b107-30c0-4140-84fa-178722fd902a" />
 
 ### 使用方式
 #### 安装
