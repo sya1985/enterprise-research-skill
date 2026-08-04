@@ -38,13 +38,16 @@ enterprise-research 是一个企业全维度背调技能。当你找工作想要
 
 ### 使用方式
 #### 安装
+下载WorkBuddy
+https://www.codebuddy.cn/events/invite?inviteCode=acjtmw4jtix2rv
+> 编写和测试用的都是腾讯的WorkBuddy，其他像扣子、openClaw、 Claude Code应该也能用。
+
 ```bash
 # 克隆到 WorkBuddy 技能目录
 git clone <repo-url> ~/.workbuddy/skills/enterprise-research/
 ```
 或手动下载后放入 `~/.workbuddy/skills/enterprise-research/`。
 
-> 编写和测试用的都是腾讯的WorkBuddy，其他像扣子、openClaw、 Claude Code应该也能用。
 
 #### 使用
 在 WorkBuddy 对话中输入：
