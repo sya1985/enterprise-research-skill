@@ -47,8 +47,18 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
 .compare-table tr:hover td { background: #fafbff; }
 .compare-table th.sortable { cursor: pointer; user-select: none; transition: background 0.15s; }
 .compare-table th.sortable:hover { background: #eef2ff; }
-.compare-table th.sortable .sort-arrow { font-size: 10px; margin-left: 3px; opacity: 0.3; }
-.compare-table th.sortable.active .sort-arrow { opacity: 1; color: #4361ee; }
+.compare-table th .sort-btn { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; margin-left: 6px; border-radius: 4px; font-size: 11px; line-height: 1; color: #aaa; border: 1px solid #e2e5ec; background: #fdfdfe; transition: all 0.15s; }
+.compare-table th.sortable:hover .sort-btn { background: #eef2ff; border-color: #c7d2fe; color: #4361ee; }
+.compare-table th .sort-btn.active { background: #4361ee; border-color: #4361ee; color: #fff; }
+.compare-table th .dim-toggle { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-left: 10px; border-radius: 3px; font-size: 10px; line-height: 1; vertical-align: middle; transition: all 0.15s; }
+.compare-table th .dim-toggle.on { background: #E24B4A; color: #fff; }
+.compare-table th .dim-toggle.on:hover { background: #c63d3c; }
+.compare-table th .dim-toggle.off { background: #639922; color: #fff; }
+.compare-table th .dim-toggle.off:hover { background: #4f7e1b; }
+.compare-table th.dim-excluded { opacity: 0.4; }
+.compare-table th.dim-excluded .dim-name { text-decoration: line-through; }
+.compare-table td.dim-excluded { color: #ccc !important; background: #f9f9f9 !important; text-decoration: line-through; }
+.compare-table .dim-hint { font-size: 11px; color: #999; font-weight: 400; margin-left: 8px; }
 /* 单企业详情 */
 .detail-view { display: none; }
 .detail-view .score-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
@@ -157,7 +167,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC"
       </div>
     </div>
     <div class="compare-table">
-      <h3>详细对比表</h3>
+      <h3>详细对比表<span class="dim-hint" id="dim-hint"></span></h3>
       <table id="compare-detail-table">
         <thead><tr></tr></thead>
         <tbody></tbody>
@@ -229,12 +239,21 @@ function scoreColor(v) {
 // 表格排序状态：col=-1 表示默认顺序，dir: asc/desc
 let sortState = { col: -1, dir: 'desc' };
 
+// 被排除的维度索引集合（点击表头×可排除/恢复）
+let excludedDims = new Set();
+
 function sortTable(col) {
-  if (sortState.col === col) {
-    sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
-  } else {
+  if (sortState.col !== col) {
     sortState.col = col;
     sortState.dir = col === 0 ? 'asc' : 'desc';
+  } else {
+    // 同一列再次点击：desc → asc → 取消排序（回到默认顺序）
+    if (sortState.dir === 'desc') {
+      sortState.dir = 'asc';
+    } else {
+      sortState.col = -1;
+      sortState.dir = 'desc';
+    }
   }
   renderCompareView();
 }
@@ -468,6 +487,42 @@ function getTotal(scores) {
   return scores.reduce((a,b)=>a+b,0);
 }
 
+// 按剩余维度计算总分
+function getActiveTotal(scores) {
+  let sum = 0;
+  for (let i = 0; i < scores.length; i++) {
+    if (!excludedDims.has(i)) sum += scores[i];
+  }
+  return sum;
+}
+
+// 剩余维度数
+function getActiveDimCount() {
+  return DIM_LABELS.length - excludedDims.size;
+}
+
+// 切换维度排除/恢复
+function toggleDim(idx) {
+  if (excludedDims.has(idx)) {
+    excludedDims.delete(idx);
+  } else {
+    if (excludedDims.size >= DIM_LABELS.length - 1) {
+      showToast("至少需要保留一个维度");
+      return;
+    }
+    excludedDims.add(idx);
+  }
+  sortState = { col: -1, dir: 'desc' };
+  renderCompareView();
+}
+
+// 恢复全部维度
+function resetDims() {
+  excludedDims.clear();
+  sortState = { col: -1, dir: 'desc' };
+  renderCompareView();
+}
+
 function renderCompanyList() {
   const list = document.getElementById("company-list");
   list.innerHTML = COMPANIES.map((c,i) => {
@@ -509,13 +564,15 @@ function renderCompareView() {
   // 雷达图
   const radarCtx = document.getElementById("radar-chart").getContext("2d");
   if (window._radarChart) window._radarChart.destroy();
+  // 仅保留未排除维度的标签与数据
+  const radarLabels = DIM_LABELS.filter((_, idx) => !excludedDims.has(idx));
   window._radarChart = new Chart(radarCtx, {
     type: "radar",
     data: {
-      labels: DIM_LABELS,
+      labels: radarLabels,
       datasets: chartCompanies.map((c,i) => ({
         label: c.name,
-        data: c.scores,
+        data: c.scores.filter((_, idx) => !excludedDims.has(idx)),
         borderColor: COLORS[i % COLORS.length],
         backgroundColor: COLORS[i % COLORS.length] + "20",
         borderWidth: (c.status==='like'?3:2),
@@ -533,7 +590,8 @@ function renderCompareView() {
   // 总分排名柱状图
   const barCtx = document.getElementById("bar-chart").getContext("2d");
   if (window._barChart) window._barChart.destroy();
-  const sorted = chartCompanies.map(c => ({name:c.name, total:getTotal(c.scores), liked:c.status==='like'}))
+  const activeMax = getActiveDimCount() * 10;
+  const sorted = chartCompanies.map(c => ({name:c.name, total:getActiveTotal(c.scores), liked:c.status==='like'}))
     .sort((a,b) => b.total - a.total);
   window._barChart = new Chart(barCtx, {
     type: "bar",
@@ -551,7 +609,7 @@ function renderCompareView() {
       indexAxis: "y",
       responsive: true,
       maintainAspectRatio: true,
-      scales: { x: { min: 0, max: 80, ticks: { stepSize: 10 } } },
+      scales: { x: { min: 0, max: activeMax, ticks: { stepSize: Math.max(1, Math.ceil(activeMax/10)) } } },
       plugins: { legend: { display: false } }
     }
   });
@@ -560,17 +618,35 @@ function renderCompareView() {
   const thead = document.querySelector("#compare-detail-table thead tr");
   const tbody = document.querySelector("#compare-detail-table tbody");
   const arrow = (col) => {
-    if (sortState.col !== col) return '<span class="sort-arrow">↕</span>';
-    return '<span class="sort-arrow">' + (sortState.dir === 'asc' ? '↑' : '↓') + '</span>';
+    const active = sortState.col === col;
+    const glyph = active ? (sortState.dir === 'asc' ? '↑' : '↓') : '↕';
+    const cls = active ? 'sort-btn active' : 'sort-btn';
+    const title = active ? '再次点击取消排序' : '点击排序';
+    return '<span class="'+cls+'" onclick="event.stopPropagation();sortTable('+col+')" title="'+title+'">'+glyph+'</span>';
   };
   const activeCls = (col) => sortState.col === col ? 'sortable active' : 'sortable';
   let h = '<th class="'+activeCls(0)+'" onclick="sortTable(0)">企业'+arrow(0)+'</th>';
   DIM_LABELS.forEach((d, idx) => {
-    h += '<th class="'+activeCls(idx+1)+'" onclick="sortTable('+(idx+1)+')">'+d+arrow(idx+1)+'</th>';
+    const excluded = excludedDims.has(idx);
+    const dimCls = excluded ? 'dim-excluded' : '';
+    const toggleIcon = excluded ? '✓' : '✕';
+    const toggleCls = excluded ? 'off' : 'on';
+    const toggleTitle = excluded ? '恢复该维度' : '排除该维度';
+    h += '<th class="'+activeCls(idx+1)+' '+dimCls+'" onclick="sortTable('+(idx+1)+')"><span class="dim-name">'+d+'</span>'+arrow(idx+1)+'<span class="dim-toggle '+toggleCls+'" onclick="event.stopPropagation();toggleDim('+idx+')" title="'+toggleTitle+'">'+toggleIcon+'</span></th>';
   });
-  h += '<th class="'+activeCls(DIM_LABELS.length+1)+'" onclick="sortTable('+(DIM_LABELS.length+1)+')">总分'+arrow(DIM_LABELS.length+1)+'</th>';
+  const activeN = getActiveDimCount();
+  h += '<th class="'+activeCls(DIM_LABELS.length+1)+'" onclick="sortTable('+(DIM_LABELS.length+1)+')">总分/'+(activeN*10)+arrow(DIM_LABELS.length+1)+'</th>';
   h += '<th class="'+activeCls(DIM_LABELS.length+2)+'" onclick="sortTable('+(DIM_LABELS.length+2)+')">均分'+arrow(DIM_LABELS.length+2)+'</th>';
   thead.innerHTML = h;
+
+  // 更新提示文字
+  const hintEl = document.getElementById("dim-hint");
+  if (excludedDims.size > 0) {
+    const excludedNames = [...excludedDims].map(i => DIM_LABELS[i]).join("、");
+    hintEl.innerHTML = '已排除：'+excludedNames+' · <a href="javascript:resetDims()" style="color:#4361ee;cursor:pointer">恢复全部</a>';
+  } else {
+    hintEl.innerHTML = '点击表头 ✕ 可排除维度并重新计分';
+  }
 
   // 构建带原始索引的显示顺序
   let displayOrder = COMPANIES.map((c, i) => ({ idx: i, c: c }));
@@ -581,8 +657,8 @@ function renderCompareView() {
       let va, vb;
       if (col === 0) { return a.c.name.localeCompare(b.c.name, 'zh') * dir; }
       else if (col <= DIM_LABELS.length) { va = a.c.scores[col-1]; vb = b.c.scores[col-1]; }
-      else if (col === DIM_LABELS.length + 1) { va = getTotal(a.c.scores); vb = getTotal(b.c.scores); }
-      else { va = getTotal(a.c.scores)/8; vb = getTotal(b.c.scores)/8; }
+      else if (col === DIM_LABELS.length + 1) { va = getActiveTotal(a.c.scores); vb = getActiveTotal(b.c.scores); }
+      else { va = getActiveTotal(a.c.scores)/getActiveDimCount(); vb = getActiveTotal(b.c.scores)/getActiveDimCount(); }
       return (va - vb) * dir;
     });
   }
@@ -590,22 +666,27 @@ function renderCompareView() {
   tbody.innerHTML = displayOrder.map(item => {
     const i = item.idx;
     const c = item.c;
-    const total = getTotal(c.scores);
-    const avg = (total/8).toFixed(1);
+    const total = getActiveTotal(c.scores);
+    const avg = (total/getActiveDimCount()).toFixed(1);
     const st = c.status || 'normal';
     const rowCls = st === 'like' ? 'liked' : st === 'dislike' ? 'disliked' : '';
     let nameCell = c.name;
     if (st === 'like') nameCell = '❤️ ' + nameCell;
     else if (st === 'dislike') nameCell = '💔 ' + nameCell;
     let row = '<td style="font-weight:600;color:#4A90D9;cursor:pointer" onclick="showDetail('+i+')">'+nameCell+'</td>';
-    c.scores.forEach(s => {
-      row += '<td class="'+(s>=8?'score-high':s>=5?'score-mid':'score-low')+'">'+s+'</td>';
+    c.scores.forEach((s, si) => {
+      if (excludedDims.has(si)) {
+        row += '<td class="dim-excluded">'+s+'</td>';
+      } else {
+        row += '<td class="'+(s>=8?'score-high':s>=5?'score-mid':'score-low')+'">'+s+'</td>';
+      }
     });
     row += '<td style="font-weight:700">'+total+'</td><td style="font-weight:600">'+avg+'</td>';
     return '<tr class="'+rowCls+'">'+row+'</tr>';
   }).join("");
 
   for (let col = 1; col <= DIM_LABELS.length; col++) {
+    if (excludedDims.has(col-1)) continue;
     let maxVal = -1, maxIdx = -1;
     COMPANIES.forEach((c, i) => { if (c.scores[col-1] > maxVal) { maxVal = c.scores[col-1]; maxIdx = i; } });
     if (maxIdx >= 0) {
