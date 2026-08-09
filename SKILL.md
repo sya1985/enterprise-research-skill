@@ -132,7 +132,7 @@ agent_created: true
 
 看板内置以下交互操作：
 
-1. **查看完整报告**：企业详情 tab 中点击「📄 查看完整报告」按钮，弹出模态窗口，通过 `marked.js` 将对应 MD 调研报告渲染为格式化 HTML 显示。需先复制 `references/server.js` 到 workspace 根目录并启动（端口 8765）以提供 MD 文件 HTTP 访问。若服务未运行，弹窗会提示「无法加载报告」并给出 `node server.js` 启动命令。
+1. **查看完整报告**：企业详情 tab 中点击「📄 查看完整报告」按钮，弹出模态窗口，通过 `marked.js` 将对应 MD 调研报告渲染为格式化 HTML 显示。本地服务由 WorkBuddy 自动启动（见「本地服务自动启动」一节），以提供 MD 文件 HTTP 访问；若服务未运行，弹窗会提示「无法加载报告」并给出 `node server.js` 启动命令。
 2. **从 MD 导入企业**：左下角「＋ 从 MD 导入企业」按钮，点击后选择本地 `.md` 调研报告文件，自动解析企业名称、8 维评分、简评、成立/规模/融资状态、城市、岗位等信息并添加到看板。若企业已存在则提示覆盖。
 3. **删除企业**：鼠标悬停企业列表中的企业项时，右侧出现 × 删除按钮，点击后确认即可从看板移除（不影响本地 MD 文件）。
 4. **维度排除与重计分**：详细对比表每个维度列表头旁有红色 ✕ 按钮，点击可排除该维度（✓ 为恢复），其余维度重算总分/均分，雷达图、总分排名柱状图同步更新；表头标题显示当前满分基数，标题旁提示已排除维度并提供「恢复全部」。至少保留 1 个维度。
@@ -144,7 +144,7 @@ agent_created: true
 - 配色方案：绿 `#639922` / 橙 `#EF9F27` / 红 `#E24B4A`
 - 所有企业评分数据以 JavaScript 数组形式嵌入 HTML 中（`<script>` 标签内），便于动态渲染
 - 企业详情（基本信息摘要）以 HTML 内联形式写入，每个企业一个 `<div>`，默认隐藏
-- 需运行 `references/server.js`（本地 Node.js 静态文件服务器，端口 8765）以提供 MD 文件的 HTTP 访问。使用时先将其复制到 workspace 根目录，在 WorkBuddy 终端运行 `node server.js`（自带 managed Node，无需额外安装）启动；该后台进程在系统/会话重启后可能停止，需要时重新运行。HTML 中 `openReport()` 函数通过 `fetch("http://localhost:8765/企业调研报告_xxx.md")` 获取 MD 内容，`marked.parse()` 渲染为 HTML 后插入模态窗口；若服务不可达，弹窗提示未运行并给出 `node server.js` 启动命令。
+- 需运行本地 Node.js 静态文件服务器（端口 8765）以提供 MD 文件的 HTTP 访问，该服务由 WorkBuddy 自动启动（见「本地服务自动启动」一节）；后台进程在会话重启后可能停止，下次使用时 WorkBuddy 会自动重新拉起。HTML 中 `openReport()` 函数通过 `fetch("http://localhost:8765/企业调研报告_xxx.md")` 获取 MD 内容，`marked.parse()` 渲染为 HTML 后插入模态窗口；若服务不可达，弹窗提示未运行并给出 `node server.js` 启动命令。
 - MD 导入使用 `FileReader` 读取本地文件，`parseMDReport()` 解析评分表/基本信息，无需后端
 - **localStorage 持久化**：看板使用 localStorage 缓存用户操作（增删企业、❤️/💔 状态），页面加载时优先从 localStorage 恢复。`initData()` 函数会合并硬编码默认数据，确保新增企业自动出现在看板中
 
@@ -162,6 +162,19 @@ agent_created: true
 - **结构化呈现**：按模板结构组织内容，使用 Markdown 标题、列表、表格等格式
 
 ---
+
+## 本地服务自动启动（推荐，默认开启）
+
+「查看完整报告」模态窗需要从本地 HTTP 服务读取 MD 调研报告，因此本技能在**每次执行前自动确保本地服务已在运行**（端口 8765，静态文件服务，提供 MD 文件 HTTP 访问），无需用户手动敲命令：
+
+1. **探测**：用 Bash/PowerShell 检查 `127.0.0.1:8765` 是否已监听（如 `Get-NetTCPConnection -LocalPort 8765` 或 `curl -s http://127.0.0.1:8765/企业对比看板.html` 返回 200）。
+2. **若未运行 → 自动后台启动**：优先用 Node.js 托管运行时。该服务以「工作目录根」为静态根目录（`ROOT = __dirname`），故 `references/server.js` 需位于工作目录根（而非 `references/`）。启动步骤：
+   - 若工作目录根不存在 `server.js`，先将 `references/server.js` 复制到工作目录根（`cp references/server.js ./server.js`）；
+   - 在**工作目录根**用 Bash 工具以 `run_in_background: true` 执行 `node server.js`，记下任务 ID；启动后探测一次确认存活（返回 200 即 OK）。
+3. **若已运行 → 直接复用**，不重复启动（避免端口冲突）。
+4. **兜底（无 Node.js 环境）**：若环境确实没有 Node.js，「查看完整报告」模态窗将无法加载 MD，弹窗会提示未运行；其余看板功能（雷达图、对比表、删除、维度排除、MD 导入）不受影响。WorkBuddy 自带托管 Node 运行时，通常无需兜底。
+
+> 该服务仅用于提供 MD 文件的 HTTP 访问；看板的增删企业、评分状态等由 HTML 内置的 localStorage 持久化（见上），与服务无关。用户也可随时在对话里让 WorkBuddy 重启服务。
 
 ## 注意事项
 
