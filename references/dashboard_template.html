@@ -832,10 +832,15 @@ function openReport(name) {
       body.innerHTML = marked.parse(md);
     })
     .catch(function(e) {
-      body.innerHTML = '<div style="text-align:center;padding:60px 0;color:#E24B4A;">' +
-        '<p style="font-size:18px;margin-bottom:8px;">无法加载报告</p>' +
-        '<p style="font-size:13px;color:#999;">'+e.message+'</p>' +
-        '<p style="font-size:13px;color:#999;">文件: '+url+'</p></div>';
+      body.innerHTML = '<div style="text-align:center;padding:48px 20px;color:#E24B4A;">' +
+        '<p style="font-size:18px;margin-bottom:10px;">无法加载报告</p>' +
+        '<p style="font-size:13px;color:#666;max-width:440px;margin:0 auto 14px;">' +
+        '本地报告服务（localhost:8765）未运行。MD 报告就在本地，启动服务后即可正常打开。' +
+        '</p>' +
+        '<p style="font-size:13px;color:#444;margin-bottom:8px;">在 WorkBuddy 终端运行：</p>' +
+        '<pre style="display:inline-block;text-align:left;font-size:12px;color:#333;background:#f4f6fb;border:1px solid #e2e6f0;border-radius:6px;padding:10px 14px;margin:0 auto;max-width:100%;overflow-x:auto;white-space:pre;">node server.js</pre>' +
+        '<p style="font-size:12px;color:#999;margin-top:14px;">或直接让 WorkBuddy 助手帮你启动</p>' +
+        '</div>';
     });
 }
 
