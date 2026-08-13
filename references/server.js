@@ -4,6 +4,7 @@ const path = require('path');
 
 const PORT = 8765;
 const ROOT = __dirname;
+const INDEX = '企业对比看板.html';
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -16,9 +17,19 @@ const MIME = {
   '.svg': 'image/svg+xml',
 };
 
+function serveFile(filePath, res) {
+  const ext = path.extname(filePath).toLowerCase();
+  res.writeHead(200, {
+    'Content-Type': MIME[ext] || 'application/octet-stream',
+    'Access-Control-Allow-Origin': '*',
+  });
+  fs.createReadStream(filePath).pipe(res);
+}
+
 const server = http.createServer((req, res) => {
-  const safePath = decodeURIComponent(path.normalize(req.url.split('?')[0]).replace(/^\/+/, ''));
-  const filePath = path.join(ROOT, safePath || '企业对比看板.html');
+  let safePath = decodeURIComponent(path.normalize(req.url.split('?')[0]).replace(/^\/+/, ''));
+  if (!safePath) safePath = INDEX; // 根路径默认返回看板
+  const filePath = path.join(ROOT, safePath);
 
   if (!filePath.startsWith(ROOT)) {
     res.writeHead(403);
@@ -33,13 +44,18 @@ const server = http.createServer((req, res) => {
       return;
     }
     if (stat.isDirectory()) {
-      res.writeHead(403);
-      res.end('Forbidden');
+      const idx = path.join(filePath, INDEX);
+      fs.stat(idx, (e2, s2) => {
+        if (e2 || !s2.isFile()) {
+          res.writeHead(403);
+          res.end('Forbidden');
+          return;
+        }
+        serveFile(idx, res);
+      });
       return;
     }
-    const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Access-Control-Allow-Origin': '*' });
-    fs.createReadStream(filePath).pipe(res);
+    serveFile(filePath, res);
   });
 });
 
